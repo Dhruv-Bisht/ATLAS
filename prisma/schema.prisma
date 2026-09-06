@@ -1,0 +1,49 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OpportunityType {
+  JOB
+  INTERNSHIP
+  SCHOLARSHIP
+}
+
+model Opportunity {
+  id                    String         @id @default(cuid())
+  externalId            String?
+  title                 String
+  type                  OpportunityType
+  organization          String
+  description           String
+  field                 String?
+  country               String
+  region                String?
+  city                  String?
+  latitude              Float
+  longitude             Float
+  workMode              String?
+  experienceRequired    String?
+  salary                String?
+  currency              String?
+  eligibility           String?
+  deadline              DateTime
+  applicationUrl        String
+  sourceUrl             String?
+  sourceName            String
+  language              String         @default("en")
+  verified              Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  lastSeenAt            DateTime       @default(now())
+
+  @@index([type])
+  @@index([country])
+  @@index([deadline])
+  @@index([latitude, longitude])
+  @@unique([sourceName, externalId])
+}
