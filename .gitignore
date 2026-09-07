@@ -4,3 +4,8 @@ node_modules
 .env.local
 .vercel
 *.log
+.env
+.env.local
+.env*.local
+node_modules/
+.next/
