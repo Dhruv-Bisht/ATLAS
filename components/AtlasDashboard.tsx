@@ -7,13 +7,13 @@ import type { Opportunity, OpportunityType } from '@/lib/types';
 
 const Globe = dynamic(() => import('./AtlasGlobe'), {
   ssr: false,
-  loading: () => <div className="globe-loading">INITIALIZING ATLAS…</div>,
+  loading: () => <div className="globe-loading"><span className="loader-orbit" />SYNCING GLOBAL OPPORTUNITIES</div>,
 });
 
-const typeMeta: Record<OpportunityType, { label: string; color: string }> = {
-  INTERNSHIP: { label: 'Internships', color: '#ff4056' },
-  JOB: { label: 'Jobs', color: '#ffbd2e' },
-  SCHOLARSHIP: { label: 'Scholarships', color: '#3288ff' },
+const meta: Record<OpportunityType, { label: string; color: string; short: string }> = {
+  INTERNSHIP: { label: 'Internships', color: '#ff4961', short: 'INTERNSHIP' },
+  JOB: { label: 'Jobs', color: '#ffc247', short: 'JOB' },
+  SCHOLARSHIP: { label: 'Scholarships', color: '#3c91ff', short: 'SCHOLARSHIP' },
 };
 
 function daysLeft(deadline?: string | null) {
@@ -28,9 +28,9 @@ export default function AtlasDashboard() {
   const [country, setCountry] = useState('ALL');
   const [field, setField] = useState('ALL');
   const [workMode, setWorkMode] = useState('ALL');
-  const [experience, setExperience] = useState('ALL');
   const [deadline, setDeadline] = useState('ALL');
   const [query, setQuery] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/opportunities')
@@ -42,200 +42,117 @@ export default function AtlasDashboard() {
           setSelected((current) => next.find((x: Opportunity) => x.id === current?.id) ?? next[0]);
         }
       })
-      .catch(() => {});
+      .catch(() => undefined);
   }, []);
 
-  const countries = useMemo(
-    () => ['ALL', ...Array.from(new Set(items.map((x) => x.country))).sort()],
-    [items]
-  );
+  const countries = useMemo(() => ['ALL', ...Array.from(new Set(items.map((x) => x.country))).sort()], [items]);
+  const fields = useMemo(() => ['ALL', ...Array.from(new Set(items.map((x) => x.field).filter(Boolean) as string[])).sort()], [items]);
 
-  const fields = useMemo(
-    () => ['ALL', ...Array.from(new Set(items.map((x) => x.field).filter(Boolean) as string[])).sort()],
-    [items]
-  );
-
-  const filtered = useMemo(
-    () =>
-      items.filter((x) => {
-        const q = query.toLowerCase();
-        const matchQ =
-          !q ||
-          [x.title, x.organization, x.country, x.city, x.field]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-            .includes(q);
-        const d = daysLeft(x.deadline);
-        return (
-          (type === 'ALL' || x.type === type) &&
-          (country === 'ALL' || x.country === country) &&
-          (field === 'ALL' || x.field === field) &&
-          (workMode === 'ALL' || (x.workMode ?? '').toLowerCase().includes(workMode.toLowerCase())) &&
-          (experience === 'ALL' || (x.experienceRequired ?? '').includes(experience)) &&
-          (deadline === 'ALL' ||
-            (deadline === '7' && d !== null && d <= 7) ||
-            (deadline === '30' && d !== null && d <= 30)) &&
-          matchQ
-        );
-      }),
-    [items, type, country, field, workMode, experience, deadline, query]
-  );
+  const filtered = useMemo(() => items.filter((x) => {
+    const q = query.trim().toLowerCase();
+    const searchable = [x.title, x.organization, x.country, x.city, x.field, x.description].filter(Boolean).join(' ').toLowerCase();
+    const d = daysLeft(x.deadline);
+    return (type === 'ALL' || x.type === type)
+      && (country === 'ALL' || x.country === country)
+      && (field === 'ALL' || x.field === field)
+      && (workMode === 'ALL' || (x.workMode ?? '').toLowerCase().includes(workMode.toLowerCase()))
+      && (deadline === 'ALL' || (deadline === '7' && d !== null && d <= 7) || (deadline === '30' && d !== null && d <= 30))
+      && (!q || searchable.includes(q));
+  }), [items, type, country, field, workMode, deadline, query]);
 
   useEffect(() => {
-    if (selected && !filtered.some((x) => x.id === selected.id)) {
-      setSelected(filtered[0] ?? null);
-    }
+    if (selected && !filtered.some((x) => x.id === selected.id)) setSelected(filtered[0] ?? null);
   }, [filtered, selected]);
 
-  const counts = {
+  const counts = useMemo(() => ({
     JOB: items.filter((x) => x.type === 'JOB').length,
     INTERNSHIP: items.filter((x) => x.type === 'INTERNSHIP').length,
     SCHOLARSHIP: items.filter((x) => x.type === 'SCHOLARSHIP').length,
-  };
+  }), [items]);
 
-  function reset() {
-    setType('ALL');
-    setCountry('ALL');
-    setField('ALL');
-    setWorkMode('ALL');
-    setExperience('ALL');
-    setDeadline('ALL');
-    setQuery('');
-  }
+  const reset = () => { setType('ALL'); setCountry('ALL'); setField('ALL'); setWorkMode('ALL'); setDeadline('ALL'); setQuery(''); };
 
   return (
-    <main className="atlas-shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark"><span /></div>
-          <div>
-            <div className="brand-name">ATLAS</div>
-            <div className="brand-sub">AUTOMATED TALENT LOCATOR &amp; APPLICATION SYSTEM</div>
-          </div>
+    <main className="atlas-app">
+      <header className="atlas-header">
+        <div className="atlas-brand">
+          <div className="atlas-logo"><span /><i /><b /></div>
+          <div><strong>ATLAS</strong><small>AUTOMATED TALENT LOCATOR</small></div>
         </div>
-        <nav>
-          <span className="active">EXPLORE</span>
-          <span>APPLY</span>
-          <span>BUILD YOUR FUTURE</span>
-        </nav>
-        <div className="live"><i /> LIVE <button className="search-top" aria-label="Search">⌕</button></div>
+        <div className="header-center"><span className="header-active">GLOBAL OPPORTUNITY INTELLIGENCE</span><span className="header-separator" /><span className="header-live"><i /> LIVE DATA</span></div>
+        <div className="header-actions"><button aria-label="Notifications">◌</button><button aria-label="Settings">⚙</button><div className="avatar">A</div></div>
       </header>
 
-      <section className="workspace">
-        <aside className="left-rail">
-          <button className="rail-button inbox"><span>♧</span> INBOX <b>3</b></button>
+      <section className="atlas-map-area">
+        <div className="map-grid" />
+        <div className="map-vignette" />
+        <div className="map-title"><span>LIVE MAP</span><strong>OPPORTUNITIES AROUND THE WORLD</strong></div>
 
-          <div className="stat-card">
-            <div className="eyebrow">TOTAL OPPORTUNITIES</div>
-            <div className="big-number">{filtered.length.toLocaleString()} <small><i /> Live</small></div>
-            <div className="stat-row"><em style={{ color: typeMeta.INTERNSHIP.color }}>●</em> Internships <strong>{counts.INTERNSHIP}</strong></div>
-            <div className="stat-row"><em style={{ color: typeMeta.JOB.color }}>●</em> Jobs <strong>{counts.JOB}</strong></div>
-            <div className="stat-row"><em style={{ color: typeMeta.SCHOLARSHIP.color }}>●</em> Scholarships <strong>{counts.SCHOLARSHIP}</strong></div>
+        <aside className="left-console">
+          <div className="console-card overview-card">
+            <div className="console-kicker">NETWORK STATUS <span><i /> OPERATIONAL</span></div>
+            <div className="total-value">{filtered.length.toLocaleString()}</div>
+            <div className="total-label">ACTIVE OPPORTUNITIES</div>
+            <div className="mini-stats">
+              {(Object.keys(meta) as OpportunityType[]).map((key) => (
+                <button key={key} onClick={() => setType(type === key ? 'ALL' : key)} className={type === key ? 'mini-stat active' : 'mini-stat'}>
+                  <i style={{ background: meta[key].color, boxShadow: `0 0 10px ${meta[key].color}` }} />
+                  <span>{meta[key].label}</span><b>{counts[key]}</b>
+                </button>
+              ))}
+            </div>
           </div>
-
-          <button className="rail-button settings">⚙ <span>SETTINGS</span></button>
+          <button className="filter-trigger" onClick={() => setFiltersOpen(!filtersOpen)}><span>☷</span> FILTER NETWORK <b>{filtered.length}</b></button>
+          {filtersOpen && (
+            <div className="console-card filter-card">
+              <Select label="TYPE" value={type} onChange={(v) => setType(v as any)} options={['ALL', 'INTERNSHIP', 'JOB', 'SCHOLARSHIP']} />
+              <Select label="COUNTRY" value={country} onChange={setCountry} options={countries} />
+              <Select label="FIELD" value={field} onChange={setField} options={fields} />
+              <Select label="WORK MODE" value={workMode} onChange={setWorkMode} options={['ALL', 'Remote', 'Hybrid', 'On-site', 'On-campus']} />
+              <Select label="DEADLINE" value={deadline} onChange={setDeadline} options={['ALL', '7', '30']} />
+              <button className="clear-btn" onClick={reset}>RESET ALL FILTERS</button>
+            </div>
+          )}
         </aside>
 
-        <div className="globe-stage">
-          <Globe opportunities={filtered} selected={selected} onSelect={setSelected} />
+        <div className="globe-container"><Globe opportunities={filtered} selected={selected} onSelect={setSelected} /></div>
 
-          <div className="timeline">
-            <span>1M</span>
-            <div className="track"><div className="track-fill" /><div className="thumb" /></div>
-            <span>6M</span><span>1Y</span><span>ALL</span>
+        <div className="map-controls"><button onClick={() => setSelected(null)}>×</button><button onClick={reset}>↻</button></div>
+
+        <aside className={`opportunity-panel ${selected ? 'visible' : ''}`}>
+          {selected && <>
+            <button className="panel-close" onClick={() => setSelected(null)}>×</button>
+            <div className="panel-type" style={{ color: meta[selected.type].color }}><i style={{ background: meta[selected.type].color }} /> {meta[selected.type].short} <span>•</span> VERIFIED</div>
+            <h1>{selected.title}</h1>
+            <div className="org-line"><div className="org-avatar">{selected.organization.slice(0, 1).toUpperCase()}</div><span>{selected.organization}</span></div>
+            <div className="panel-location"><span>⌖</span><b>{selected.city ? `${selected.city}, ` : ''}{selected.region ? `${selected.region}, ` : ''}{selected.country}</b></div>
+            <div className="panel-grid">
+              <Info label="FIELD" value={selected.field || 'Not specified'} />
+              <Info label="EXPERIENCE" value={selected.experienceRequired || 'Student / Entry'} />
+              <Info label="WORK MODE" value={selected.workMode || 'Not specified'} />
+              <Info label="COMPENSATION" value={selected.salary ? `${selected.salary} ${selected.currency ?? ''}` : 'Not published'} />
+            </div>
+            <div className="deadline-box"><div><span>APPLICATION DEADLINE</span><strong>{selected.deadline ? new Date(selected.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not published'}</strong></div>{selected.deadline && <b>{daysLeft(selected.deadline)} DAYS LEFT</b>}</div>
+            <p className="panel-description">{selected.description}</p>
+            <a className="apply-btn" href={selected.applicationUrl} target="_blank" rel="noreferrer">OPEN OFFICIAL LISTING <span>↗</span></a>
+            <div className="source-line">SOURCE <b>{selected.sourceName}</b>{selected.verified && <span>✓ Official source</span>}</div>
+          </>}
+        </aside>
+
+        <div className="search-dock">
+          <div className="search-input"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search companies, roles, fields, countries..." /><kbd>/</kbd></div>
+          <div className="legend-dock">
+            {(Object.keys(meta) as OpportunityType[]).map((key) => <button key={key} onClick={() => setType(type === key ? 'ALL' : key)}><i style={{ background: meta[key].color }} />{meta[key].label}<b>{counts[key]}</b></button>)}
           </div>
         </div>
 
-        <aside className="details-panel">
-          {selected ? (
-            <div className="detail-card">
-              <button className="close" onClick={() => setSelected(null)} aria-label="Close">×</button>
-
-              <div className="pin-title">
-                <span className="mini-map-pin" style={{ ['--pin-color' as string]: typeMeta[selected.type].color }}>
-                  <i />
-                </span>
-                <div>
-                  <h1>{selected.title}</h1>
-                  <h2>{selected.organization}</h2>
-                </div>
-              </div>
-
-              <span
-                className="type-pill"
-                style={{
-                  borderColor: typeMeta[selected.type].color,
-                  color: typeMeta[selected.type].color,
-                }}
-              >
-                {typeMeta[selected.type].label.slice(0, -1).toUpperCase()}
-              </span>
-
-              <div className="detail-lines">
-                <p>⌖ <b>{selected.city ? `${selected.city}, ` : ''}{selected.region ? `${selected.region}, ` : ''}{selected.country}</b></p>
-                <p>◫ <b>{selected.field || 'Not specified'}</b></p>
-                <p>♙ <b>{selected.experienceRequired ?? 'Not specified'}</b></p>
-                <p>▣ <b>{selected.workMode ?? 'Not specified'}</b></p>
-                {selected.salary && <p>◉ <b>{selected.salary} {selected.currency ?? ''}</b></p>}
-                {selected.deadline ? (
-                  <p>◷ <b>Deadline: {new Date(selected.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</b> <span className="days">{daysLeft(selected.deadline)} days left</span></p>
-                ) : (
-                  <p>◷ <b>Deadline: Not published by source</b></p>
-                )}
-              </div>
-
-              <p className="description">{selected.description}</p>
-              <a className="apply" href={selected.applicationUrl} target="_blank" rel="noreferrer">View Details ↗</a>
-              <a className="company-link" href={selected.sourceUrl ?? selected.applicationUrl} target="_blank" rel="noreferrer">↗ &nbsp; Source: {selected.sourceName}</a>
-              {selected.verified && <div className="verified">✓ Verified official source</div>}
-            </div>
-          ) : (
-            <div className="empty-detail">SELECT A PIN<br /><small>Choose an opportunity on the globe.</small></div>
-          )}
-        </aside>
-      </section>
-
-      <div className="legend">
-        <span><i className="legend-pin internship" /> INTERNSHIPS</span>
-        <span><i className="legend-pin job" /> JOBS</span>
-        <span><i className="legend-pin scholarship" /> SCHOLARSHIPS</span>
-      </div>
-
-      <section className="filters">
-        <div className="filter-title">☷ &nbsp; Filters</div>
-        <Filter label="Type" value={type} onChange={(v) => setType(v as any)} options={['ALL', 'INTERNSHIP', 'JOB', 'SCHOLARSHIP']} />
-        <Filter label="Country" value={country} onChange={setCountry} options={countries} />
-        <Filter label="Field of Study" value={field} onChange={setField} options={fields} />
-        <Filter label="Work Mode" value={workMode} onChange={setWorkMode} options={['ALL', 'Remote', 'Hybrid', 'On-site', 'On-campus']} />
-        <Filter label="Experience Level" value={experience} onChange={setExperience} options={['ALL', '0–2 years', 'Students / 0–1 year']} />
-        <Filter label="Deadline" value={deadline} onChange={setDeadline} options={['ALL', '7', '30']} />
-        <button className="reset" onClick={reset}>↻ Reset</button>
-        <input className="keyword" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="⌕  Search by keyword..." />
+        <div className="map-footer"><span>ATLAS GLOBAL INDEX</span><span>DATA SOURCES <b>14</b></span><span>LAST SYNC <b>LIVE</b></span><span className="coords">LAT 20.00° &nbsp; LNG 20.00°</span></div>
       </section>
     </main>
   );
 }
 
-function Filter({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <label className="filter">
-      <span>{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o} value={o}>{o === 'ALL' ? 'All' : o === '7' ? 'Next 7 days' : o === '30' ? 'Next 30 days' : o}</option>
-        ))}
-      </select>
-    </label>
-  );
+function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return <label className="select-field"><span>{label}</span><select value={value} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o} value={o}>{o === 'ALL' ? 'All' : o === '7' ? 'Next 7 days' : o === '30' ? 'Next 30 days' : o}</option>)}</select></label>;
 }
+function Info({ label, value }: { label: string; value: string }) { return <div className="info-cell"><span>{label}</span><b>{value}</b></div>; }
