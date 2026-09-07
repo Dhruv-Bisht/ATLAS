@@ -15,7 +15,7 @@ enum OpportunityType {
 
 model Opportunity {
   id                    String         @id @default(cuid())
-  externalId            String?
+  externalId            String
   title                 String
   type                  OpportunityType
   organization          String
@@ -31,7 +31,7 @@ model Opportunity {
   salary                String?
   currency              String?
   eligibility           String?
-  deadline              DateTime
+  deadline              DateTime?
   applicationUrl        String
   sourceUrl             String?
   sourceName            String
@@ -39,11 +39,13 @@ model Opportunity {
   verified              Boolean        @default(false)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
-  lastSeenAt            DateTime       @default(now())
+  firstSeenAt            DateTime       @default(now())
+  lastSeenAt             DateTime       @default(now())
 
   @@index([type])
   @@index([country])
   @@index([deadline])
+  @@index([lastSeenAt])
   @@index([latitude, longitude])
   @@unique([sourceName, externalId])
 }

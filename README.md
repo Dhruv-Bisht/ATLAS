@@ -1,44 +1,41 @@
 # ATLAS — Automated Talent Locator & Application System
 
-A Vercel-ready global opportunity intelligence dashboard. The globe is the primary UI: internships are red, jobs yellow, scholarships blue. Selecting a marker automatically flies the globe to the opportunity's geographic coordinates and opens its card.
+ATLAS is a global opportunity map for jobs, internships and scholarships. The globe is the primary discovery interface; opportunities are normalized, located, deduplicated by source identity, and automatically removed when their explicit deadline passes or when a source listing has gone stale.
 
-## Included in this starter
-- Dark, intelligence-style 3D Earth UI inspired by the supplied reference.
-- Red/yellow/blue opportunity markers.
-- Automatic globe fly-to on marker selection.
-- English-only data model (`language = en`).
-- Deadline filtering and automatic expiry in API/database queries.
-- Search, type, country, field, work mode, experience and deadline filters.
-- Official/company/application URL on every published record.
-- Prisma/PostgreSQL schema.
-- Seed data for local development.
-- Adzuna adapter for jobs when API credentials are supplied.
-- Conservative Cheerio scraper utility for pages with an explicit deadline and apply link.
-- Vercel cron every 6 hours for ingestion/expiry.
+## Data sources
 
-## Run locally
+The default ingestion pipeline uses **no paid API keys**:
+
+- **Himalayas Remote Jobs API** — public JSON API, no authentication required. ATLAS uses it server-side and displays source attribution.
+- **Arbeitnow Job Board API** — public job feed. ATLAS uses it as a no-key discovery source.
+- **Scholarship program catalog** — optional free tier for scholarship data. It currently provides 100 requests/day and requires a free API key. The current free dataset covers Australia and New Zealand.
+- **Adzuna** — optional. If you add `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, ATLAS also ingests Adzuna listings. The developer portal requires registration for these credentials. ATLAS still works when both variables are empty.
+
+JobSpy, Firecrawl, SerpApi and Apify are intentionally **not required for the Vercel deployment**. JobSpy is a Python scraper and is better run as a separate worker rather than inside a Next.js/Vercel request. Firecrawl/SerpApi/Apify can be added later as optional adapters without making the core platform dependent on paid services.
+
+## Important deadline rule
+
+ATLAS never invents a deadline when a source does not publish one. For example, some job feeds expose an expiry date while others do not. If an explicit deadline exists, ATLAS stores it and removes the listing after it passes. If a source does not provide a deadline, ATLAS keeps the listing only while it continues to appear in the source; the ingestion job removes such listings after seven days without seeing them.
+
+## Local setup
+
+1. Copy `.env.example` to `.env`.
+2. Add a PostgreSQL `DATABASE_URL` for persistent data.
+3. Optionally add free Adzuna developer credentials.
+4. Run:
+
 ```bash
 npm install
-cp .env.example .env.local
-npm run db:push
+npx prisma generate
+npx prisma db push
 npm run db:seed
 npm run dev
 ```
 
-If `DATABASE_URL` is not available, the UI falls back to the bundled demo dataset so the frontend still runs.
+The frontend can still display seed data when the database is unavailable.
 
-## Deploy on Vercel
-1. Push this folder to GitHub.
-2. Import the repo into Vercel.
-3. Add a hosted PostgreSQL database and set `DATABASE_URL`.
-4. Add `CRON_SECRET` and source credentials if used.
-5. Deploy.
+## Vercel
 
-Vercel cron calls `/api/ingest`. The route refreshes configured sources and removes expired records. For a production-scale crawler, move heavy scraping to a dedicated worker/queue rather than making a Vercel function crawl the open web.
+Set `DATABASE_URL` and `CRON_SECRET` in Vercel project environment variables. The cron endpoint is `/api/ingest`.
 
-## Important production notes
-- Do not scrape a website unless its terms/robots policy and applicable law allow it. Prefer official APIs, feeds and public career pages.
-- Add source-specific adapters rather than one universal scraper.
-- Geocode city/country locations during ingestion and store coordinates in PostgreSQL; do not geocode on every map render.
-- Add deduplication fingerprints before publishing large volumes of records.
-- Keep the application URL and source URL separate so students can always reach the official application page.
+The ingestion endpoint is protected by `CRON_SECRET` when it is configured.
